@@ -1,6 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 let books = require("./booksdb.js");
+const findBookByISBN = require("./booksdb.js").findBookByISBN;
 const regd_users = express.Router();
 
 let users = [];
@@ -17,22 +18,24 @@ const isValid = (username) => {
   return !users.some((user) => user.username === username);
 };
 
-const authenticatedUser = (username, password) => {
-  // Filter the users array for any user with the same username and password
-  let validusers = users.filter((user) => {
-    return user.username === username && user.password === password;
-  });
+const authenticatedUser = async (username, password) => {
+  return new Promise((resolve) => {
+    // Filter the users array for any user with the same username and password
+    let validusers = users.filter((user) => {
+      return user.username === username && user.password === password;
+    });
 
-  // Return true if any valid user is found, otherwise false
-  if (validusers.length > 0) {
-    return true;
-  } else {
-    return false;
-  }
+    // Return true if any valid user is found, otherwise false
+    if (validusers.length > 0) {
+      resolve(true);
+    } else {
+      resolve(false);
+    }
+  });
 };
 
 //only registered users can login
-regd_users.post("/login", (req, res) => {
+regd_users.post("/login", async (req, res) => {
   const username = req.body.username;
   const password = req.body.password;
 
@@ -40,7 +43,7 @@ regd_users.post("/login", (req, res) => {
     return res.status(400).json({ message: "Invalid request" });
   }
 
-  if (authenticatedUser(username, password)) {
+  if (await authenticatedUser(username, password)) {
     // Generate JWT access token
     let accessToken = jwt.sign(
       {
@@ -64,7 +67,7 @@ regd_users.post("/login", (req, res) => {
 });
 
 // Add a book review
-regd_users.put("/auth/review/:isbn", (req, res) => {
+regd_users.put("/auth/review/:isbn", async (req, res) => {
   const isbn = req.params.isbn;
   const username = req.session.authorization.username;
   const newReview = req.body;
@@ -72,7 +75,7 @@ regd_users.put("/auth/review/:isbn", (req, res) => {
   if (!isbn || !username || !newReview) {
     return res.status(400).json({ message: "Invalid request" });
   }
-  const book = books[isbn];
+  const book = await findBookByISBN(isbn);
   if (!book) {
     return res.status(404).json({ message: "Book not found" });
   }
@@ -81,14 +84,14 @@ regd_users.put("/auth/review/:isbn", (req, res) => {
 });
 
 // Delete a book review
-regd_users.delete("/auth/review/:isbn", (req, res) => {
+regd_users.delete("/auth/review/:isbn", async (req, res) => {
   const isbn = req.params.isbn;
   const username = req.session.authorization.username;
 
   if (!isbn || !username) {
     return res.status(400).json({ message: "Invalid request" });
   }
-  const book = books[isbn];
+  const book = await findBookByISBN(isbn);
   if (!book) {
     return res.status(404).json({ message: "Book not found" });
   }
